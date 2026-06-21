@@ -51,7 +51,14 @@ def parse_gedcom_date(date_text):
     month = MONTHS.get(month_text)
     if month is None:
         return None
-    return date(int(year_text), month, int(day_text))
+    try:
+        return date(int(year_text), month, int(day_text))
+    except ValueError:
+        return None
+
+
+def is_legitimate_date(date_text):
+    return parse_gedcom_date(date_text) is not None
 
 
 def parse_gedcom(lines):
@@ -381,6 +388,8 @@ def build_report(individuals, families, today=None, source_lines=None):
     deceased_headers = ["ID", "Name", "Death", "Age"]
     gender_headers = ["Type", "Story", "Family ID", "Individual ID", "Name", "Role", "Expected", "Actual"]
     duplicate_headers = ["Type", "Story", "Record Type", "ID", "First Line", "Duplicate Line"]
+    line_number_headers = ["ID", "Type", "Line Number"]
+    illegitimate_date_headers = ["Type", "Story", "Record ID", "Event", "Date", "Line Number"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
     family_table = render_table("Families", family_headers, format_family_rows(families, individuals))
     age_table = render_table("US27 Include Individual Ages", age_headers, format_age_rows(individuals, today))
@@ -402,7 +411,7 @@ def build_report(individuals, families, today=None, source_lines=None):
         find_duplicate_ids(source_lines or []),
         "No duplicate individual or family IDs were found.",
     )
-     line_number_table = render_story_result(
+    line_number_table = render_story_result(
         "US40 Include Input Line Numbers",
         line_number_headers,
         find_record_line_numbers(source_lines or []),
@@ -414,7 +423,7 @@ def build_report(individuals, families, today=None, source_lines=None):
         find_illegitimate_dates(source_lines or []),
         "No illegitimate dates were found.",
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n"
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n"
 
 
 def load_gedcom(path):
