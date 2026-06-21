@@ -194,6 +194,75 @@ def format_deceased_rows(individuals, today=None):
     return rows
 
 
+def format_age_rows(individuals, today=None):
+    today = today or date.today()
+    rows = []
+    for individual_id in sorted(individuals, key=natural_id_key):
+        individual = individuals[individual_id]
+        rows.append([
+            individual.individual_id,
+            individual.name,
+            format_age(individual, today),
+        ])
+    return rows
+
+
+def format_gender_role_errors(families, individuals):
+    rows = []
+    for family_id in sorted(families, key=natural_id_key):
+        family = families[family_id]
+        add_gender_role_error(rows, family, individuals, family.husband_id, "Husband", "M")
+        add_gender_role_error(rows, family, individuals, family.wife_id, "Wife", "F")
+    return rows
+
+
+def find_duplicate_ids(lines):
+    first_seen = {}
+    duplicates = []
+    for line_number, raw_line in enumerate(lines, start=1):
+        parts = raw_line.strip().split(maxsplit=2)
+        if len(parts) != 3 or parts[0] != "0" or not parts[1].startswith("@"):
+            continue
+
+        record_type = parts[2]
+        if record_type not in {"INDI", "FAM"}:
+            continue
+
+        clean_record_id = clean_id(parts[1])
+        key = (record_type, clean_record_id)
+        if key in first_seen:
+            display_type = "Individual" if record_type == "INDI" else "Family"
+            duplicates.append([
+                "ERROR",
+                "US22",
+                display_type,
+                clean_record_id,
+                str(first_seen[key]),
+                str(line_number),
+            ])
+        else:
+            first_seen[key] = line_number
+    return duplicates
+
+
+def add_gender_role_error(rows, family, individuals, individual_id, role, expected_gender):
+    if individual_id == "NA":
+        return
+    individual = individuals.get(individual_id, Individual(individual_id))
+    actual_gender = individual.gender
+    if actual_gender != expected_gender:
+        rows.append([
+            "ERROR",
+            "US21",
+            family.family_id,
+            individual_id,
+            individual.name,
+            role,
+            expected_gender,
+            actual_gender,
+        ])
+
+
 def natural_id_key(value):
     match = re.fullmatch(r"([A-Za-z]+)(\d+)", value)
     if not match:
@@ -242,7 +311,13 @@ def render_table(title, headers, rows):
     return "\n".join([title, separator, header_line, separator, *body_lines, separator])
 
 
-def build_report(individuals, families, today=None):
+def render_story_result(title, headers, rows, empty_message):
+    if not rows:
+        return f"{title}\n{empty_message}"
+    return render_table(title, headers, rows)
+
+
+def build_report(individuals, families, today=None, source_lines=None):
     individual_headers = ["ID", "Name", "Gender", "Birthday", "Age", "Alive", "Death", "Child", "Spouse"]
     family_headers = [
         "ID",
@@ -254,11 +329,32 @@ def build_report(individuals, families, today=None):
         "Wife Name",
         "Children",
     ]
+    age_headers = ["ID", "Name", "Age"]
     deceased_headers = ["ID", "Name", "Death", "Age"]
+    gender_headers = ["Type", "Story", "Family ID", "Individual ID", "Name", "Role", "Expected", "Actual"]
+    duplicate_headers = ["Type", "Story", "Record Type", "ID", "First Line", "Duplicate Line"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
     family_table = render_table("Families", family_headers, format_family_rows(families, individuals))
-    deceased_table = render_table("US29 List Deceased", deceased_headers, format_deceased_rows(individuals, today))
-    return f"{individual_table}\n\n{family_table}\n\n{deceased_table}\n"
+    age_table = render_table("US27 Include Individual Ages", age_headers, format_age_rows(individuals, today))
+    deceased_table = render_story_result(
+        "US29 List Deceased",
+        deceased_headers,
+        format_deceased_rows(individuals, today),
+        "No deceased individuals were found.",
+    )
+    gender_table = render_story_result(
+        "US21 Correct Gender for Role",
+        gender_headers,
+        format_gender_role_errors(families, individuals),
+        "No gender role errors were found.",
+    )
+    duplicate_table = render_story_result(
+        "US22 Unique IDs",
+        duplicate_headers,
+        find_duplicate_ids(source_lines or []),
+        "No duplicate individual or family IDs were found.",
+    )
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n"
 
 
 def load_gedcom(path):
@@ -272,8 +368,9 @@ def main():
     parser.add_argument("-o", "--output", help="Optional output text file")
     args = parser.parse_args()
 
-    individuals, families = parse_gedcom(load_gedcom(args.gedcom_file))
-    report = build_report(individuals, families)
+    source_lines = load_gedcom(args.gedcom_file)
+    individuals, families = parse_gedcom(source_lines)
+    report = build_report(individuals, families, source_lines=source_lines)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as output_file:
             output_file.write(report)
