@@ -244,6 +244,54 @@ def find_duplicate_ids(lines):
             first_seen[key] = line_number
     return duplicates
 
+def find_record_line_numbers(lines):
+    rows =[]
+    for  line_number, raw_line in enumerate(lines, start=1):
+        parts = raw_line.strip().split(maxsplit=2)
+        if len(parts) == 3 and parts[0] == "0" and parts[1].startswith("@") and parts[2] in {"INDI", "FAM"}:
+            display_type = "Individual" if parts[2] == "INDI" else "Family"
+            rows.append([
+                clean_id(parts[1]),
+                display_type,
+                str(line_number),
+            ])
+            
+    return rows
+
+def find_illegitimate_dates(lines):
+    rows = []
+    current_record_id = "NA"
+    current_event = "NA"
+    for line_number, raw_line in enumerate(lines, start=1):
+        parts = raw_line.strip().split(maxsplit=2)
+        if not parts:
+            continue
+        level = parts[0]
+        if level == "0":
+            current_event = "NA"
+            if len(parts) == 3 and parts[1].startswith("@") and parts[2] in {"INDI", "FAM"}:
+                current_record_id = clean_id(parts[1])
+            else:
+                current_record_id = "NA"
+            continue
+        if len(parts) < 2:
+            continue
+        tag = parts[1]
+        value = parts[2] if len(parts) == 3 else ""
+        if level == "1":
+            current_event = tag if tag in {"BIRT", "DEAT", "MARR", "DIV"} else "NA"
+        elif level == "2" and tag == "DATE" and current_event != "NA":
+            if not is_legitimate_date(value):
+                rows.append([
+                    "ERROR",
+                    "US42",
+                    current_record_id,
+                    current_event,
+                    value.strip(),
+                    str(line_number),
+                ])
+    return rows
+
 
 def add_gender_role_error(rows, family, individuals, individual_id, role, expected_gender):
     if individual_id == "NA":
@@ -353,6 +401,18 @@ def build_report(individuals, families, today=None, source_lines=None):
         duplicate_headers,
         find_duplicate_ids(source_lines or []),
         "No duplicate individual or family IDs were found.",
+    )
+     line_number_table = render_story_result(
+        "US40 Include Input Line Numbers",
+        line_number_headers,
+        find_record_line_numbers(source_lines or []),
+        "No individual or family records were found.",
+    )
+    illegitimate_date_table = render_story_result(
+        "US42 Reject Illegitimate Dates",
+        illegitimate_date_headers,
+        find_illegitimate_dates(source_lines or []),
+        "No illegitimate dates were found.",
     )
     return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n"
 
