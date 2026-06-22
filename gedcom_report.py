@@ -214,41 +214,44 @@ def format_age_rows(individuals, today=None):
     return rows
 
 
-def format_gender_role_errors(families, individuals):
+def verify_gender_roles(families, individuals):
     rows = []
+
     for family_id in sorted(families, key=natural_id_key):
+
         family = families[family_id]
-        add_gender_role_error(rows, family, individuals, family.husband_id, "Husband", "M")
-        add_gender_role_error(rows, family, individuals, family.wife_id, "Wife", "F")
+        gender_role_has_error(rows, family, individuals, family.husband_id, "Husband", "M")
+        gender_role_has_error(rows, family, individuals, family.wife_id, "Wife", "F")
+
     return rows
 
 
-def find_duplicate_ids(lines):
-    first_seen = {}
+def verify_no_duplicate_ids(lines):
+    first_id_created = {}
     duplicates = []
-    for line_number, raw_line in enumerate(lines, start=1):
-        parts = raw_line.strip().split(maxsplit=2)
+    for line_number, line in enumerate(lines, start=1):
+        parts = line.split(maxsplit = 2)
         if len(parts) != 3 or parts[0] != "0" or not parts[1].startswith("@"):
             continue
 
-        record_type = parts[2]
-        if record_type not in {"INDI", "FAM"}:
+        current_record = parts[2]
+        if current_record not in {"INDI", "FAM"}:
             continue
 
-        clean_record_id = clean_id(parts[1])
-        key = (record_type, clean_record_id)
-        if key in first_seen:
-            display_type = "Individual" if record_type == "INDI" else "Family"
+        clean_current_record = clean_id(parts[1])
+        ID_num = (current_record, clean_current_record)
+        if ID_num in first_id_created:
+            display_type = "Individual" if current_record == "INDI" else "Family"
             duplicates.append([
                 "ERROR",
-                "US22",
+                "US22:",
                 display_type,
-                clean_record_id,
-                str(first_seen[key]),
+                clean_current_record,
+                str(first_id_created[ID_num]),
                 str(line_number),
             ])
         else:
-            first_seen[key] = line_number
+            first_id_created[ID_num] = line_number
     return duplicates
 
 def find_record_line_numbers(lines):
@@ -300,7 +303,7 @@ def find_illegitimate_dates(lines):
     return rows
 
 
-def add_gender_role_error(rows, family, individuals, individual_id, role, expected_gender):
+def gender_role_has_error(rows, family, individuals, individual_id, role, expected_gender):
     if individual_id == "NA":
         return
     individual = individuals.get(individual_id, Individual(individual_id))
@@ -400,16 +403,16 @@ def build_report(individuals, families, today=None, source_lines=None):
         "No deceased individuals were found.",
     )
     gender_table = render_story_result(
-        "US21 Correct Gender for Role",
+        "US21: Gender Role Verification",
         gender_headers,
-        format_gender_role_errors(families, individuals),
-        "No gender role errors were found.",
+        verify_gender_roles(families, individuals),
+        "No issues were found with genders tied to family roles.",
     )
     duplicate_table = render_story_result(
-        "US22 Unique IDs",
+        "US22: Duplicate IDs for Individuals and Families",
         duplicate_headers,
-        find_duplicate_ids(source_lines or []),
-        "No duplicate individual or family IDs were found.",
+        verify_no_duplicate_ids(source_lines or []),
+        "No IDs for either family or individuals were found to be duplicated.",
     )
     line_number_table = render_story_result(
         "US40 Include Input Line Numbers",
