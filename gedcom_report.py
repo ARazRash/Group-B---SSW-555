@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional, Set
 
-
 MONTHS = {
     "JAN": 1,
     "FEB": 2,
@@ -218,7 +217,6 @@ def verify_gender_roles(families, individuals):
     rows = []
 
     for family_id in sorted(families, key=natural_id_key):
-
         family = families[family_id]
         gender_role_has_error(rows, family, individuals, family.husband_id, "Husband", "M")
         gender_role_has_error(rows, family, individuals, family.wife_id, "Wife", "F")
@@ -230,7 +228,7 @@ def verify_no_duplicate_ids(lines):
     first_id_created = {}
     duplicates = []
     for line_number, line in enumerate(lines, start=1):
-        parts = line.split(maxsplit = 2)
+        parts = line.split(maxsplit=2)
         if len(parts) != 3 or parts[0] != "0" or not parts[1].startswith("@"):
             continue
 
@@ -254,9 +252,10 @@ def verify_no_duplicate_ids(lines):
             first_id_created[ID_num] = line_number
     return duplicates
 
+
 def find_record_line_numbers(lines):
-    rows =[]
-    for  line_number, raw_line in enumerate(lines, start=1):
+    rows = []
+    for line_number, raw_line in enumerate(lines, start=1):
         parts = raw_line.strip().split(maxsplit=2)
         if len(parts) == 3 and parts[0] == "0" and parts[1].startswith("@") and parts[2] in {"INDI", "FAM"}:
             display_type = "Individual" if parts[2] == "INDI" else "Family"
@@ -265,8 +264,9 @@ def find_record_line_numbers(lines):
                 display_type,
                 str(line_number),
             ])
-            
+
     return rows
+
 
 def find_illegitimate_dates(lines):
     rows = []
@@ -320,6 +320,23 @@ def gender_role_has_error(rows, family, individuals, individual_id, role, expect
             actual_gender,
         ])
 
+def marriage_before_divorce(families):
+    rows = []
+
+    for family_id in sorted(families, key=natural_id_key):
+        family = families[family_id]
+
+    if family.married and family.divorced:
+        if family.married > family.divorced:
+            rows.append([
+                "ERROR",
+                "US04",
+                family,
+                family.family_id,
+                format_date(family.married),
+                format_date(family.divorced)
+        ])
+    return rows
 
 def natural_id_key(value):
     match = re.fullmatch(r"([A-Za-z]+)(\d+)", value)
@@ -327,7 +344,6 @@ def natural_id_key(value):
         return (value, 0)
     prefix, number = match.groups()
     return (prefix, int(number))
-
 
 def format_date(value):
     return value.isoformat() if value else "NA"
@@ -393,6 +409,7 @@ def build_report(individuals, families, today=None, source_lines=None):
     duplicate_headers = ["Type", "Story", "Record Type", "ID", "First Line", "Duplicate Line"]
     line_number_headers = ["ID", "Type", "Line Number"]
     illegitimate_date_headers = ["Type", "Story", "Record ID", "Event", "Date", "Line Number"]
+    marriage_divorce_headers = ["Type", "Story", "Family ID", "Marriage Date", "Divorce Date"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
     family_table = render_table("Families", family_headers, format_family_rows(families, individuals))
     age_table = render_table("US27 Include Individual Ages", age_headers, format_age_rows(individuals, today))
@@ -426,7 +443,13 @@ def build_report(individuals, families, today=None, source_lines=None):
         find_illegitimate_dates(source_lines or []),
         "No illegitimate dates were found.",
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n"
+    marriage_table = render_story_result(
+        "US04 Marriage Occurs Before Divorce",
+        marriage_divorce_headers,
+        marriage_before_divorce(families),
+        "No divorces before marriage were found.",
+    )
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n"
 
 
 def load_gedcom(path):
