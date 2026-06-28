@@ -338,6 +338,25 @@ def marriage_before_divorce(families):
         ])
     return rows
 
+def marriage_before_death(families, individuals):
+    rows = []
+
+    for family_id in sorted(families, key=natural_id_key):
+        family = families[family_id]
+
+    if family.married and individuals.death:
+        if family.married > individuals.death:
+            rows.append([
+                "ERROR",
+                "US05",
+                family,
+                family.family_id,
+                individuals.individual_id,
+                format_date(family.married),
+                format_date(individuals.death)
+        ])
+    return rows
+
 def natural_id_key(value):
     match = re.fullmatch(r"([A-Za-z]+)(\d+)", value)
     if not match:
@@ -410,6 +429,7 @@ def build_report(individuals, families, today=None, source_lines=None):
     line_number_headers = ["ID", "Type", "Line Number"]
     illegitimate_date_headers = ["Type", "Story", "Record ID", "Event", "Date", "Line Number"]
     marriage_divorce_headers = ["Type", "Story", "Family ID", "Marriage Date", "Divorce Date"]
+    marriage_death_headers = ["Type", "Story", "Family ID", "Marriage Date", "Death Date"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
     family_table = render_table("Families", family_headers, format_family_rows(families, individuals))
     age_table = render_table("US27 Include Individual Ages", age_headers, format_age_rows(individuals, today))
@@ -449,7 +469,13 @@ def build_report(individuals, families, today=None, source_lines=None):
         marriage_before_divorce(families),
         "No divorces before marriage were found.",
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n"
+    marriage_death_table = render_story_result(
+        "US05 Marriage before Deaths",
+        marriage_death_headers,
+        marriage_before_divorce(families),
+        "No deaths occur before marriage.",
+    )
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}"
 
 
 def load_gedcom(path):
