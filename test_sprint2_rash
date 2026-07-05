@@ -1,0 +1,50 @@
+import unittest
+from datetime import date
+
+from gedcom_report import (
+    marriage_before_divorce,
+    marriage_before_death,
+    parse_gedcom
+)
+
+def parse_sample(text):
+    return parse_gedcom(text.strip().splitlines())
+
+class Sprint2RashTest(unittest.TestCase):
+    def test_marriage_before_divorce(self):
+        fam_sample = [
+        "0 @F4@ FAM",
+        "1 MARR",
+        "2 DATE 1 JUN 2004",
+        "1 DIV",
+        "2 DATE 1 SEP 2006",
+        ]
+
+        individuals, families = parse_gedcom(fam_sample)
+        rows = marriage_before_divorce(families)
+        self.assertEqual(rows, [])
+
+    def test_marriage_before_death(self):
+        new_sample = [
+            "0 @F3@ FAM",
+            "1 HUSB @I3@",
+            "1 WIFE @I4@",
+            "1 MARR",
+            "2 DATE 1 JUN 2006",
+            "1 CHIL @I6@",
+            "1 CHIL @I9@",
+            "1 _CURRENT N",
+            "1 _PRIMARY N",
+
+            "1 NAME Mandy Willows",
+            "1 SEX F",
+            "1 BIRT",
+            "2 DATE 5 JUL 1985",
+            "1 DEAT Y",
+            "2 DATE 10 NOV 2007",
+            "1 FAMS @F3@"
+            ]
+
+        individuals, families = parse_gedcom(new_sample)
+        rows = marriage_before_death(families, individuals)
+        self.assertEqual(rows, [])
