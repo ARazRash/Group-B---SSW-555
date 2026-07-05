@@ -242,7 +242,7 @@ def verify_no_duplicate_ids(lines):
             display_type = "Individual" if current_record == "INDI" else "Family"
             duplicates.append([
                 "ERROR",
-                "US22:",
+                "US22",
                 display_type,
                 clean_current_record,
                 str(first_id_created[ID_num]),
@@ -251,6 +251,66 @@ def verify_no_duplicate_ids(lines):
         else:
             first_id_created[ID_num] = line_number
     return duplicates
+
+
+def find_dates_after_current_date(lines, today=None):
+    today = today or date.today()
+    rows = []
+    current_record_id = "NA"
+    current_event = "NA"
+
+    for line_number, raw_line in enumerate(lines, start=1):
+        parts = raw_line.strip().split(maxsplit=2)
+        if not parts:
+            continue
+
+        level = parts[0]
+        if level == "0":
+            current_event = "NA"
+            if len(parts) == 3 and parts[1].startswith("@") and parts[2] in {"INDI", "FAM"}:
+                current_record_id = clean_id(parts[1])
+            else:
+                current_record_id = "NA"
+            continue
+
+        if len(parts) < 2:
+            continue
+
+        tag = parts[1]
+        value = parts[2] if len(parts) == 3 else ""
+        if level == "1":
+            current_event = tag if tag in {"BIRT", "DEAT", "MARR", "DIV"} else "NA"
+        elif level == "2" and tag == "DATE" and current_event != "NA":
+            parsed_date = parse_gedcom_date(value)
+            if parsed_date and parsed_date > today:
+                rows.append([
+                    "ERROR",
+                    "US01",
+                    current_record_id,
+                    current_event,
+                    format_date(parsed_date),
+                    str(line_number),
+                ])
+
+    return rows
+
+
+def find_birth_after_death(individuals):
+    rows = []
+
+    for individual_id in sorted(individuals, key=natural_id_key):
+        individual = individuals[individual_id]
+        if individual.birthday and individual.death and individual.birthday > individual.death:
+            rows.append([
+                "ERROR",
+                "US03",
+                individual.individual_id,
+                individual.name,
+                format_date(individual.birthday),
+                format_date(individual.death),
+            ])
+
+    return rows
 
 
 def find_record_line_numbers(lines):
@@ -319,6 +379,11 @@ def gender_role_has_error(rows, family, individuals, individual_id, role, expect
             expected_gender,
             actual_gender,
         ])
+
+
+format_gender_role_errors = verify_gender_roles
+find_duplicate_ids = verify_no_duplicate_ids
+
 
 def marriage_before_divorce(families):
     rows = []
@@ -440,6 +505,8 @@ def build_report(individuals, families, today=None, source_lines=None):
     deceased_headers = ["ID", "Name", "Death", "Age"]
     gender_headers = ["Type", "Story", "Family ID", "Individual ID", "Name", "Role", "Expected", "Actual"]
     duplicate_headers = ["Type", "Story", "Record Type", "ID", "First Line", "Duplicate Line"]
+    date_check_headers = ["Type", "Story", "Record ID", "Event", "Date", "Line Number"]
+    birth_death_headers = ["Type", "Story", "Individual ID", "Name", "Birth Date", "Death Date"]
     line_number_headers = ["ID", "Type", "Line Number"]
     illegitimate_date_headers = ["Type", "Story", "Record ID", "Event", "Date", "Line Number"]
     marriage_divorce_headers = ["Type", "Story", "Family ID", "Marriage Date", "Divorce Date"]
@@ -465,6 +532,18 @@ def build_report(individuals, families, today=None, source_lines=None):
         verify_no_duplicate_ids(source_lines or []),
         "No IDs for either family or individuals were found to be duplicated.",
     )
+    date_check_table = render_story_result(
+        "US01 Dates Before Current Date",
+        date_check_headers,
+        find_dates_after_current_date(source_lines or [], today),
+        "No dates after the current date were found.",
+    )
+    birth_death_table = render_story_result(
+        "US03 Birth Before Death",
+        birth_death_headers,
+        find_birth_after_death(individuals),
+        "No birth dates after death dates were found.",
+    )
     line_number_table = render_story_result(
         "US40 Include Input Line Numbers",
         line_number_headers,
@@ -489,7 +568,7 @@ def build_report(individuals, families, today=None, source_lines=None):
         marriage_before_death(families, individuals),
         "No deaths occur before marriage.",
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}"
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}"
 
 
 def load_gedcom(path):

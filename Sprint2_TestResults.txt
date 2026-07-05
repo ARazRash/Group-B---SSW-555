@@ -1,0 +1,103 @@
+Individuals
++-----+----------------+--------+------------+-----+-------+------------+--------+--------------+
+| ID  | Name           | Gender | Birthday   | Age | Alive | Death      | Child  | Spouse       |
++-----+----------------+--------+------------+-----+-------+------------+--------+--------------+
+| I1  | Janet Willows  | F      | 1962-05-05 | 64  | True  | NA         | NA     | {'F1'}       |
+| I2  | Alfred Willows | M      | 1962-09-02 | 63  | True  | NA         | NA     | {'F1'}       |
+| I3  | Mark Willows   | M      | 1984-12-01 | 41  | True  | NA         | {'F1'} | {'F2', 'F3'} |
+| I4  | Mandy Willows  | F      | 1985-07-05 | 22  | False | 2007-11-10 | NA     | {'F3'}       |
+| I5  | Lexis Willows  | F      | 1985-04-30 | 41  | True  | NA         | NA     | {'F2', 'F4'} |
+| I6  | Max Willows    | M      | 2007-02-24 | 19  | True  | NA         | {'F3'} | NA           |
+| I7  | Nico Front     | M      | 2005-06-16 | 21  | True  | NA         | {'F4'} | NA           |
+| I8  | Montana Front  | M      | 1984-08-02 | 41  | True  | NA         | NA     | {'F4'}       |
+| I9  | Nancy Willows  | F      | 2005-10-13 | 20  | True  | NA         | {'F3'} | NA           |
+| I10 | Claire Bronto  | F      | 1987-10-04 | 38  | True  | NA         | {'F1'} | {'F5'}       |
+| I11 | Morgan Bronto  | M      | 1985-03-24 | 41  | True  | NA         | NA     | {'F5'}       |
+| I12 | Braxton Bronto | M      | 2011-01-25 | 15  | True  | NA         | {'F5'} | NA           |
+| I13 | Maury Bronto   | M      | 2013-08-28 | 12  | True  | NA         | {'F5'} | NA           |
+| I14 | Olivia Bronto  | F      | 2016-10-14 | 9   | True  | NA         | {'F5'} | NA           |
++-----+----------------+--------+------------+-----+-------+------------+--------+--------------+
+
+Families
++----+------------+------------+------------+----------------+---------+---------------+-----------------------+
+| ID | Married    | Divorced   | Husband ID | Husband Name   | Wife ID | Wife Name     | Children              |
++----+------------+------------+------------+----------------+---------+---------------+-----------------------+
+| F1 | 1983-02-14 | NA         | I2         | Alfred Willows | I1      | Janet Willows | {'I3', 'I10'}         |
+| F2 | 2005-06-01 | NA         | I3         | Mark Willows   | I5      | Lexis Willows | NA                    |
+| F3 | 2006-06-01 | NA         | I3         | Mark Willows   | I4      | Mandy Willows | {'I6', 'I9'}          |
+| F4 | 2004-06-01 | 2006-09-01 | I8         | Montana Front  | I5      | Lexis Willows | {'I7'}                |
+| F5 | 2010-06-01 | NA         | I11        | Morgan Bronto  | I10     | Claire Bronto | {'I12', 'I13', 'I14'} |
++----+------------+------------+------------+----------------+---------+---------------+-----------------------+
+
+US27 Include Individual Ages
++-----+----------------+-----+
+| ID  | Name           | Age |
++-----+----------------+-----+
+| I1  | Janet Willows  | 64  |
+| I2  | Alfred Willows | 63  |
+| I3  | Mark Willows   | 41  |
+| I4  | Mandy Willows  | 22  |
+| I5  | Lexis Willows  | 41  |
+| I6  | Max Willows    | 19  |
+| I7  | Nico Front     | 21  |
+| I8  | Montana Front  | 41  |
+| I9  | Nancy Willows  | 20  |
+| I10 | Claire Bronto  | 38  |
+| I11 | Morgan Bronto  | 41  |
+| I12 | Braxton Bronto | 15  |
+| I13 | Maury Bronto   | 12  |
+| I14 | Olivia Bronto  | 9   |
++-----+----------------+-----+
+
+US29 List Deceased
++----+---------------+------------+-----+
+| ID | Name          | Death      | Age |
++----+---------------+------------+-----+
+| I4 | Mandy Willows | 2007-11-10 | 22  |
++----+---------------+------------+-----+
+
+US21: Gender Role Verification
+No issues were found with genders tied to family roles.
+
+US22: Duplicate IDs for Individuals and Families
+No IDs for either family or individuals were found to be duplicated.
+
+US01 Dates Before Current Date
+No dates after the current date were found.
+
+US03 Birth Before Death
+No birth dates after death dates were found.
+
+US04 Marriage Occurs Before Divorce
+No divorces before marriage were found.
+
+US40 Include Input Line Numbers
++-----+------------+-------------+
+| ID  | Type       | Line Number |
++-----+------------+-------------+
+| I1  | Individual | 15          |
+| I2  | Individual | 21          |
+| I3  | Individual | 27          |
+| I4  | Individual | 35          |
+| I5  | Individual | 43          |
+| I6  | Individual | 50          |
+| I7  | Individual | 56          |
+| I8  | Individual | 62          |
+| I9  | Individual | 68          |
+| I10 | Individual | 74          |
+| I11 | Individual | 81          |
+| I12 | Individual | 87          |
+| I13 | Individual | 93          |
+| I14 | Individual | 99          |
+| F1  | Family     | 105         |
+| F2  | Family     | 114         |
+| F3  | Family     | 121         |
+| F4  | Family     | 130         |
+| F5  | Family     | 140         |
++-----+------------+-------------+
+
+US42 Reject Illegitimate Dates
+No illegitimate dates were found.
+
+US05 Marriage before Deaths
+No deaths occur before marriage.
