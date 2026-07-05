@@ -199,6 +199,19 @@ def format_deceased_rows(individuals, today=None):
             ])
     return rows
 
+def format_living_married_rows(individuals, today=None):
+    today = today or date.today()
+    rows = []
+    for individual_id in sorted(individuals, key=natural_id_key):
+        individual = individuals[individual_id]
+        if not individual.death_recorded and individual.spouse_families:
+            rows.append([
+                individual.individual_id,
+                individual.name,
+                format_age(individual, today),
+                format_id_set(individual.spouse_families),
+            ])
+    return rows
 
 def format_age_rows(individuals, today=None):
     today = today or date.today()
@@ -312,6 +325,23 @@ def find_birth_after_death(individuals):
 
     return rows
 
+def find_over_age_limit(individuals, today=None, limit=150):
+    today = today or date.today()
+    rows = []
+    for individual_id in sorted(individuals, key=natural_id_key):
+        individual = individuals[individual_id]
+        age = compute_age(individual, today)
+        if age is not None and age >= limit:
+            rows.append([
+                "ERROR",
+                "US07",
+                individual.individual_id,
+                individual.name,
+                format_date(individual.birthday),
+                format_date(individual.death),
+                str(age),
+            ])
+    return rows
 
 def find_record_line_numbers(lines):
     rows = []
@@ -411,29 +441,29 @@ def marriage_before_death(families, individuals):
         if family.married is None:
             continue
 
-    husband = individuals.get(family.husband_id)
-    if husband and husband.death:
-        if family.married > husband.death:
-            rows.append([
-                "ERROR",
-                "US05",
-                family.family_id,
-                husband.individual_id,
-                format_date(family.married),
-                format_date(husband.death)
-            ])
+        husband = individuals.get(family.husband_id)
+        if husband and husband.death:
+            if family.married > husband.death:
+                rows.append([
+                    "ERROR",
+                    "US05",
+                    family.family_id,
+                    husband.individual_id,
+                    format_date(family.married),
+                    format_date(husband.death)
+                ])
 
-    wife = individuals.get(family.wife_id)
-    if wife and wife.death:
-        if family.married > wife.death:
-            rows.append([
-                "ERROR",
-                "US05",
-                family.family_id,
-                husband.individual_id,
-                format_date(family.married),
-                format_date(wife.death)
-            ])
+        wife = individuals.get(family.wife_id)
+        if wife and wife.death:
+            if family.married > wife.death:
+                rows.append([
+                    "ERROR",
+                    "US05",
+                    family.family_id,
+                    wife.individual_id,
+                    format_date(family.married),
+                    format_date(wife.death)
+                ])
     return rows
 
 def natural_id_key(value):
@@ -447,14 +477,19 @@ def format_date(value):
     return value.isoformat() if value else "NA"
 
 
-def format_age(individual, today):
+def compute_age(individual, today):
     if individual.birthday is None:
-        return "NA"
+        return None
     end_date = individual.death or today
     age = end_date.year - individual.birthday.year
     if (end_date.month, end_date.day) < (individual.birthday.month, individual.birthday.day):
         age -= 1
-    return str(age)
+    return age
+
+
+def format_age(individual, today):
+    age = compute_age(individual, today)
+    return "NA" if age is None else str(age)
 
 
 def format_id_set(values):
@@ -511,6 +546,8 @@ def build_report(individuals, families, today=None, source_lines=None):
     illegitimate_date_headers = ["Type", "Story", "Record ID", "Event", "Date", "Line Number"]
     marriage_divorce_headers = ["Type", "Story", "Family ID", "Marriage Date", "Divorce Date"]
     marriage_death_headers = ["Type", "Story", "Family ID", "Individual ID", "Marriage Date", "Death Date"]
+    over_age_headers = ["Type", "Story", "Individual ID", "Name", "Birth Date", "Death Date", "Age"]
+    living_married_headers = ["ID", "Name", "Age", "Spouse"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
     family_table = render_table("Families", family_headers, format_family_rows(families, individuals))
     age_table = render_table("US27 Include Individual Ages", age_headers, format_age_rows(individuals, today))
@@ -519,6 +556,12 @@ def build_report(individuals, families, today=None, source_lines=None):
         deceased_headers,
         format_deceased_rows(individuals, today),
         "No deceased individuals were found.",
+    )
+    living_married_table = render_story_result(
+        "US30 List Living Married",
+        living_married_headers,
+        format_living_married_rows(individuals, today),
+        "No living married individuals were found.",
     )
     gender_table = render_story_result(
         "US21: Gender Role Verification",
@@ -544,6 +587,12 @@ def build_report(individuals, families, today=None, source_lines=None):
         find_birth_after_death(individuals),
         "No birth dates after death dates were found.",
     )
+    over_age_table = render_story_result(
+        "US07 Less Than 150 Years Old",
+        over_age_headers,
+        find_over_age_limit(individuals, today),
+        "No individuals aged 150 or older were found.",
+    )
     line_number_table = render_story_result(
         "US40 Include Input Line Numbers",
         line_number_headers,
@@ -568,8 +617,7 @@ def build_report(individuals, families, today=None, source_lines=None):
         marriage_before_death(families, individuals),
         "No deaths occur before marriage.",
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}"
-
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{living_married_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{over_age_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}"
 
 def load_gedcom(path):
     with open(path, "r", encoding="utf-8-sig") as gedcom_file:
