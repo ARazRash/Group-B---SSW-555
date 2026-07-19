@@ -1,0 +1,151 @@
+import unittest
+from datetime import date
+
+from gedcom_report import (
+    no_family_bigamy,
+    parents_not_too_old,
+    parse_gedcom
+)
+
+def parse_sample(text):
+    return parse_gedcom(text.strip().splitlines())
+
+class Sprint3RashTest(unittest.TestCase):
+    def test_no_family_bigamy(self):
+        no_bigamy_sample = [
+        "0 @I5@ INDI",
+        "1 NAME Lexis Willows",
+        "1 SEX F",
+        "1 BIRT",
+        "2 DATE 30 APR 1985",
+        "1 FAMS @F2@",
+        "1 FAMS @F4@",
+
+        "0 @F4@ FAM",
+        "1 HUSB @I8@",
+        "1 WIFE @I5@",
+        "1 MARR",
+        "2 DATE 1 JUN 2004",
+        "1 DIV",
+        "2 DATE 1 SEP 2006"
+        ]
+
+        individuals, families = parse_gedcom(no_bigamy_sample)
+        rows = no_family_bigamy(families, individuals)
+        self.assertEqual(rows, [])
+
+    def test_bigamy_exists(self):
+        bigamy_sample = [
+            "0 @I5@ INDI",
+            "1 NAME Lexis Willows",
+            "1 SEX F",
+            "1 BIRT",
+            "2 DATE 30 APR 1985",
+            "1 FAMS @F2@",
+            "1 FAMS @F4@",
+
+            "0 @I8@ INDI",
+            "1 NAME Montana Front",
+            "1 SEX M",
+            "1 BIRT",
+            "2 DATE 2 AUG 1984",
+            "1 FAMS @F4@",
+
+            "0 @F4@ FAM",
+            "1 HUSB @I8@",
+            "1 WIFE @I5@",
+            "1 MARR",
+            "2 DATE 1 JUN 2004",
+
+            "0 @F2@ FAM",
+            "1 HUSB @I3@",
+            "1 WIFE @I5@",
+            "1 MARR",
+            "2 DATE 1 JUN 2005"
+        ]
+        individuals, families = parse_gedcom(bigamy_sample)
+        rows = no_family_bigamy(families, individuals)
+
+        print(rows)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1], "US11")
+
+    def test_parents_not_old(self):
+        new_sample = [
+            "1 NAME Mark Willows",
+            "1 SEX M",
+            "1 BIRT",
+            "2 DATE 1 DEC 1984",
+            "1 FAMS @F2@",
+            "1 FAMS @F3@",
+            "1 FAMC @F1@",
+
+            "0 @I4@ INDI",
+            "1 NAME Mandy Willows",
+            "1 SEX F",
+            "1 BIRT",
+            "2 DATE 5 JUL 1985",
+            "1 DEAT Y",
+            "2 DATE 10 NOV 2007",
+
+            "0 @I6@ INDI",
+            "1 NAME Max Willows",
+            "1 SEX M",
+            "1 BIRT",
+            "2 DATE 24 FEB 2007",
+            "1 FAMC @F3@",
+
+            "0 @F3@ FAM",
+            "1 HUSB @I3@",
+            "1 WIFE @I4@",
+            "1 MARR",
+            "2 DATE 1 JUN 2006",
+            "1 CHIL @I6@",
+            "1 CHIL @I9@"
+            ]
+
+        individuals, families = parse_gedcom(new_sample)
+        rows = parents_not_too_old(families, individuals)
+        self.assertEqual(rows, [])
+
+    def test_parents_too_old(self):
+        new_sample_1 = [
+            "1 NAME Mark Willows",
+            "1 SEX M",
+            "1 BIRT",
+            "2 DATE 1 DEC 1926",
+            "1 FAMS @F2@",
+            "1 FAMS @F3@",
+            "1 FAMC @F1@",
+
+            "0 @I4@ INDI",
+            "1 NAME Mandy Willows",
+            "1 SEX F",
+            "1 BIRT",
+            "2 DATE 5 JUL 1945",
+            "1 DEAT Y",
+            "2 DATE 10 NOV 2007",
+
+            "0 @I6@ INDI",
+            "1 NAME Max Willows",
+            "1 SEX M",
+            "1 BIRT",
+            "2 DATE 24 FEB 2007",
+            "1 FAMC @F3@",
+
+            "0 @F3@ FAM",
+            "1 HUSB @I3@",
+            "1 WIFE @I4@",
+            "1 MARR",
+            "2 DATE 1 JUN 2006",
+            "1 CHIL @I6@",
+            "1 CHIL @I9@"
+            ]
+
+        individuals, families = parse_gedcom(new_sample_1)
+        rows = parents_not_too_old(families, individuals)
+        print(rows)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1], "US12")
