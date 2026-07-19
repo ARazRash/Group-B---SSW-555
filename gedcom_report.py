@@ -466,6 +466,81 @@ def marriage_before_death(families, individuals):
                 ])
     return rows
 
+def no_family_bigamy(families, individuals):
+    rows = []
+
+    for spouses in individuals.values():
+        lines = []
+
+        for family_id in sorted(spouses.spouse_families):
+            family = families.get(family_id)
+
+            if family is None or family.married is None:
+                continue
+
+            marriage_date = family.married
+
+            for previous_marriage_date, previous_divorce_date, previous_family in lines:
+                if marriage_date <= previous_marriage_date:
+                    rows.append([
+                        "ERROR",
+                        "US11",
+                        spouses.individual_id,
+                        spouses.name,
+                        previous_family.family_id,
+                        family.family_id
+                    ])
+            lines.append((family.married, family.divorced, family))
+    return rows
+
+def parents_not_too_old(families, individuals):
+    rows = []
+
+    for family_id in sorted(families, key=natural_id_key):
+        family = families[family_id]
+
+        dad = individuals.get(family.husband_id)
+        mom = individuals.get(family.wife_id)
+
+        for child_id in family.children:
+            child = individuals.get(child_id)
+
+            if child is None:
+                continue
+
+            if dad and dad.birthday:
+                dads_age = child.birthday.year - dad.birthday.year
+
+                if dads_age >= 80:
+                    rows.append([
+                        "ERROR",
+                        "US12",
+                        family.family_id,
+                        dad.individual_id,
+                        dad.name,
+                        child.individual_id,
+                        child.name,
+                        "dad",
+                        str(dads_age),
+                    ])
+
+            if mom and mom.birthday:
+                moms_age = child.birthday.year - mom.birthday.year
+
+                if moms_age >= 60:
+                    rows.append([
+                        "ERROR",
+                        "US12",
+                        family.family_id,
+                        mom.individual_id,
+                        mom.name,
+                        child.individual_id,
+                        child.name,
+                        "mom",
+                        str(moms_age),
+                    ])
+    return rows
+
 def natural_id_key(value):
     match = re.fullmatch(r"([A-Za-z]+)(\d+)", value)
     if not match:
@@ -548,6 +623,8 @@ def build_report(individuals, families, today=None, source_lines=None):
     marriage_death_headers = ["Type", "Story", "Family ID", "Individual ID", "Marriage Date", "Death Date"]
     over_age_headers = ["Type", "Story", "Individual ID", "Name", "Birth Date", "Death Date", "Age"]
     living_married_headers = ["ID", "Name", "Age", "Spouse"]
+    no_bigamy_headers = ["Type", "Story", "Individual ID", "Name", "First Family", "Second Family"]
+    parents_not_old_headers = ["Type", "Story", "Family", "Parent", "Child", "Age Difference"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
     family_table = render_table("Families", family_headers, format_family_rows(families, individuals))
     age_table = render_table("US27 Include Individual Ages", age_headers, format_age_rows(individuals, today))
@@ -617,7 +694,19 @@ def build_report(individuals, families, today=None, source_lines=None):
         marriage_before_death(families, individuals),
         "No deaths occur before marriage.",
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{living_married_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{over_age_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}"
+    no_bigamy_table = render_story_result(
+        "US11 No Bigamy in Family",
+        no_bigamy_headers,
+        no_family_bigamy(families, individuals),
+        "No bigamy is found inside the families."
+    )
+    parents_age_table = render_story_result(
+        "US12 Parents Are Not Too Old",
+        parents_not_old_headers,
+        parents_not_too_old(families, individuals),
+        "Parents of children are not too old for children."
+    )
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{living_married_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{over_age_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}\n\n{no_bigamy_table}\n\n{parents_age_table}"
 
 def load_gedcom(path):
     with open(path, "r", encoding="utf-8-sig") as gedcom_file:
