@@ -224,7 +224,45 @@ def format_age_rows(individuals, today=None):
             format_age(individual, today),
         ])
     return rows
+def format_living_single_rows(individuals, today=None):
+    today = today or date.today()
+    rows = []
+    for individual_id in sorted(individuals, key=natural_id_key):
+        individual = individuals[individual_id]
+        if not individual.death_recorded and not individual.spouse_families:
+            rows.append([
+                individual.individual_id,
+                individual.name,
+                individual.gender,
+                format_age(individual, today),
+            ])
+    return rows
 
+
+def format_sibling_age_order_rows(families, individuals, today=None):
+    today = today or date.today()
+    rows = []
+    for family_id in sorted(families, key=natural_id_key):
+        family = families[family_id]
+        siblings = [individuals[child_id] for child_id in family.children if child_id in individuals]
+        siblings.sort(key=sibling_age_key)
+        for position, sibling in enumerate(siblings, start=1):
+            rows.append([
+                family.family_id,
+                str(position),
+                sibling.individual_id,
+                sibling.name,
+                format_date(sibling.birthday),
+                format_age(sibling, today),
+            ])
+    return rows
+
+def sibling_age_key(sibling):
+    return (
+        sibling.birthday is None,
+        sibling.birthday or date.max,
+        natural_id_key(sibling.individual_id),
+    )
 
 def verify_gender_roles(families, individuals):
     rows = []
@@ -623,6 +661,8 @@ def build_report(individuals, families, today=None, source_lines=None):
     marriage_death_headers = ["Type", "Story", "Family ID", "Individual ID", "Marriage Date", "Death Date"]
     over_age_headers = ["Type", "Story", "Individual ID", "Name", "Birth Date", "Death Date", "Age"]
     living_married_headers = ["ID", "Name", "Age", "Spouse"]
+    living_single_headers = ["ID", "Name", "Gender", "Age"]
+    sibling_order_headers = ["Family ID", "Order", "ID", "Name", "Birthday", "Age"]
     no_bigamy_headers = ["Type", "Story", "Individual ID", "Name", "First Family", "Second Family"]
     parents_not_old_headers = ["Type", "Story", "Family", "Parent", "Child", "Age Difference"]
     individual_table = render_table("Individuals", individual_headers, format_individual_rows(individuals, today))
@@ -639,6 +679,18 @@ def build_report(individuals, families, today=None, source_lines=None):
         living_married_headers,
         format_living_married_rows(individuals, today),
         "No living married individuals were found.",
+    )
+    living_single_table = render_story_result(
+        "US31 List Living Single",
+        living_single_headers,
+        format_living_single_rows(individuals, today),
+        "No living single individuals were found.",
+    )
+    sibling_order_table = render_story_result(
+        "US28 Order Siblings by Age",
+        sibling_order_headers,
+        format_sibling_age_order_rows(families, individuals, today),
+        "No siblings were found to order.",
     )
     gender_table = render_story_result(
         "US21: Gender Role Verification",
@@ -706,8 +758,7 @@ def build_report(individuals, families, today=None, source_lines=None):
         parents_not_too_old(families, individuals),
         "Parents of children are not too old for children."
     )
-    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{living_married_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{over_age_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}\n\n{no_bigamy_table}\n\n{parents_age_table}"
-
+    return f"{individual_table}\n\n{family_table}\n\n{age_table}\n\n{deceased_table}\n\n{living_married_table}\n\n{living_single_table}\n\n{sibling_order_table}\n\n{gender_table}\n\n{duplicate_table}\n\n{date_check_table}\n\n{birth_death_table}\n\n{over_age_table}\n\n{marriage_table}\n\n{line_number_table}\n\n{illegitimate_date_table}\n\n{marriage_death_table}\n\n{no_bigamy_table}\n\n{parents_age_table}"
 def load_gedcom(path):
     with open(path, "r", encoding="utf-8-sig") as gedcom_file:
         return gedcom_file.readlines()
